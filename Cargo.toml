@@ -1,0 +1,17 @@
+[package]
+name = "coded"
+version = "0.1.0"
+edition = "2021"
+description = "concrete error type with an `ErrorKind` enum matching Google's \"canonical error codes\""
+keywords = ["error", "google"]
+categories = ["rust-patterns"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+# See lib.rs doc comment for description of features.
+default = []
+unstable_std_backtrace = []
+
+[dependencies]
+backtrace = { version = "0.3.63", optional = true }

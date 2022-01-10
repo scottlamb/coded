@@ -1,0 +1,45 @@
+name: CI
+on: [push, pull_request]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  rust:
+    name: Test
+    strategy:
+      matrix:
+        rust:
+          - 1.56.0
+          - stable
+          - nightly
+        include:
+          - rust: stable
+            extra_components: rustfmt
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Cache
+      uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ matrix.rust }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: ${{ matrix.rust }}
+        override: true
+        components: ${{ matrix.extra_components }}
+    - name: Test with no features
+      run: cargo test --all-targets
+    - name: Test with backtrace feature
+      run: cargo test --all-targets --features=backtrace
+    - name: Test with unstable_std_backtrace feature
+      if: matrix.rust == 'nightly'
+      run: cargo test --all-targets --features=unstable_std_backtrace
