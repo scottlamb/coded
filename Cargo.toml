@@ -1,10 +1,13 @@
 [package]
 name = "coded"
 version = "0.1.0"
+license = "MIT/Apache-2.0"
+readme = "README.md"
 edition = "2021"
 description = "concrete error type with an `ErrorKind` enum matching Google's \"canonical error codes\""
 keywords = ["error", "google"]
 categories = ["rust-patterns"]
+repository = "https://github.com/scottlamb/coded"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
