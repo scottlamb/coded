@@ -40,6 +40,6 @@ jobs:
       run: cargo test --all-targets
     - name: Test with backtrace feature
       run: cargo test --all-targets --features=backtrace
-    - name: Test with unstable_std_backtrace feature
+    - name: Test with std_backtrace feature
       if: matrix.rust == 'nightly'
-      run: cargo test --all-targets --features=unstable_std_backtrace
+      run: cargo test --all-targets --features=std_backtrace

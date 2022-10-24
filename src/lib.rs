@@ -14,14 +14,10 @@
 //! *   `backtrace`: exports backtraces as described at [`Error`]. The backtrace
 //!     is not exposed to the caller except through the human-readable message
 //!     produced by `Error::chain`.
-//! *   `unstable_std_backtrace`: as above, but also implement
-//!     `std::Error::backtrace`. This requires an unstable feature and thus
-//!     nightly Rust of an unstated range that has a compatible API. It's
-//!     unstable from `coded`'s perspective also: the required Rust
-//!     compiler version may change without `coded`'s major version
-//!     changing.
-
-#![cfg_attr(feature = "std_backtrace", feature(backtrace))]
+//! *   `std_backtrace`: as above, but also expose a `std::backtrace::Backtrace` via
+//!     an inherent method on Error. This requires Rust 1.65+. Note: likely a future
+//!     version will also expose the backtrace through the [provider
+//!     API](https://github.com/rust-lang/rust/issues/96024), once that's stable.
 
 #[cfg(feature = "std_backtrace")]
 mod std_backtrace;
@@ -50,7 +46,7 @@ use std::fmt::Display;
 /// *   A human-readable message.
 /// *   An optional source/cause, exposed through `std::error::Error::cause`.
 /// *   An optional backtrace. This is present if `coded` was compiled
-///     with the `backtrace` or `unstable_std_backtrace` feature flags **and**
+///     with the `backtrace` or `std_backtrace` feature flags **and**
 ///     the program was run with `RUST_BACKTRACE` or `RUST_LIB_BACKTRACE` set as
 ///     described at [`std::backtrace`].
 ///
@@ -102,6 +98,12 @@ impl Error {
         ErrorChain(self)
     }
 
+    /// Returns a backtrace, if available.
+    #[cfg(feature = "std_backtrace")]
+    pub fn backtrace(&self) -> Option<&std::backtrace::Backtrace> {
+        self.0.backtrace.as_ref()
+    }
+
     #[cfg(any(feature = "std_backtrace", feature = "backtrace"))]
     fn fmt_backtrace(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(bt) = self.0.backtrace.as_ref() {
@@ -149,11 +151,6 @@ impl StdError for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         // https://users.rust-lang.org/t/question-about-error-source-s-static-return-type/34515/8
         self.0.source.as_ref().map(|e| e.as_ref() as &_)
-    }
-
-    #[cfg(feature = "std_backtrace")]
-    fn backtrace(&self) -> Option<&std::backtrace::Backtrace> {
-        self.0.backtrace.as_ref()
     }
 }
 
@@ -495,7 +492,7 @@ impl From<std::io::ErrorKind> for ErrorKind {
             // There are currently several `io::ErrorKind`s gated by `io_error_more`:
             // <https://github.com/rust-lang/rust/issues/86442>. Mapping these
             // all to `Unknown` for now. We could map them to a more specific `ErrorKind`
-            // with an unstable feature like `unstable_std_backtrace`.
+            // with an unstable feature.
             _ => Unknown,
         }
     }

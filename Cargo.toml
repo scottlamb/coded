@@ -14,7 +14,9 @@ repository = "https://github.com/scottlamb/coded"
 [features]
 # See lib.rs doc comment for description of features.
 default = []
-unstable_std_backtrace = []
+
+# requires Rust 1.65+ (expected to be released 2022-11-03).
+std_backtrace = []
 
 [dependencies]
 backtrace = { version = "0.3.63", optional = true }
