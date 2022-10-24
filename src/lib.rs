@@ -74,7 +74,11 @@ impl Error {
     }
 
     /// Returns a new error wrapping a source with no additional message.
-    pub fn wrap<E: StdError + 'static>(kind: ErrorKind, msg: Option<String>, source: E) -> Self {
+    pub fn wrap<E: StdError + Send + Sync + 'static>(
+        kind: ErrorKind,
+        msg: Option<String>,
+        source: E,
+    ) -> Self {
         Error(Box::new(ErrorInt {
             kind,
             msg,
@@ -143,7 +147,8 @@ impl Display for ErrorChain<'_> {
 
 impl StdError for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.0.source.as_deref()
+        // https://users.rust-lang.org/t/question-about-error-source-s-static-return-type/34515/8
+        self.0.source.as_ref().map(|e| e.as_ref() as &_)
     }
 
     #[cfg(feature = "std_backtrace")]
@@ -188,7 +193,7 @@ impl ErrorBuilder {
     }
 
     #[inline]
-    pub fn source<S: Into<Box<dyn StdError + 'static>>>(mut self, source: S) -> Self {
+    pub fn source<S: Into<Box<dyn StdError + Send + Sync + 'static>>>(mut self, source: S) -> Self {
         self.0.source = Some(source.into());
         self
     }
@@ -202,7 +207,7 @@ impl ErrorBuilder {
 /// Creates a new builder for an error which uses `e` for its source and kind.
 impl<E> From<E> for ErrorBuilder
 where
-    E: StdError + 'static + ToErrKind,
+    E: StdError + 'static + Sync + Send + ToErrKind,
 {
     #[inline(always)]
     fn from(e: E) -> Self {
@@ -222,7 +227,7 @@ impl From<ErrorKind> for ErrorBuilder {
 struct ErrorInt {
     kind: ErrorKind,
     msg: Option<String>,
-    source: Option<Box<dyn StdError + 'static>>,
+    source: Option<Box<dyn StdError + Send + Sync + 'static>>,
 
     #[cfg_attr(
         not(any(feature = "std_backtrace", feature = "backtrace")),
@@ -547,7 +552,7 @@ pub trait ResultExt<T, E> {
     }
 }
 
-impl<T, E: StdError + 'static> ResultExt<T, E> for Result<T, E> {
+impl<T, E: StdError + Send + Sync + 'static> ResultExt<T, E> for Result<T, E> {
     /// Wraps errors using the given kind.
     #[inline]
     fn err_kind<K: Into<ErrorKind>>(self, k: K) -> Result<T, ErrorBuilder> {
@@ -673,6 +678,12 @@ macro_rules! err {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn _assert_send_sync<T: Send + Sync>() {}
+
+    fn _assert_error_send_sync() {
+        _assert_send_sync::<Error>()
+    }
 
     #[test]
     fn chain() {
