@@ -52,6 +52,11 @@ pub struct Backtrace {
     backtrace: UnsafeCell<backtrace::Backtrace>,
 }
 
+// Backtrace isn't Send+Sync by default because of the backtrace field, but its usage is protected
+// by once.
+unsafe impl Send for Backtrace {}
+unsafe impl Sync for Backtrace {}
+
 impl Backtrace {
     fn resolve(&self) -> &backtrace::Backtrace {
         self.resolved
