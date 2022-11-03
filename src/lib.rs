@@ -8,32 +8,8 @@
 
 //! Concrete error type with an `ErrorKind` enum matching Google's "canonical
 //! error codes" and associated types/helpers.
-//!
-//! # Cargo features
-//!
-//! *   `backtrace`: exports backtraces as described at [`Error`]. The backtrace
-//!     is not exposed to the caller except through the human-readable message
-//!     produced by `Error::chain`.
-//! *   `std_backtrace`: as above, but also expose a `std::backtrace::Backtrace` via
-//!     an inherent method on Error. This requires Rust 1.65+. Note: likely a future
-//!     version will also expose the backtrace through the [provider
-//!     API](https://github.com/rust-lang/rust/issues/96024), once that's stable.
 
-#[cfg(feature = "std_backtrace")]
-mod std_backtrace;
-#[cfg(feature = "std_backtrace")]
-use std_backtrace as bt;
-
-#[cfg(all(not(feature = "std_backtrace"), feature = "backtrace"))]
-mod nonstd_backtrace;
-#[cfg(all(not(feature = "std_backtrace"), feature = "backtrace"))]
-use nonstd_backtrace as bt;
-
-#[cfg(not(any(feature = "std_backtrace", feature = "backtrace")))]
-mod noop_backtrace;
-#[cfg(not(any(feature = "std_backtrace", feature = "backtrace")))]
-use noop_backtrace as bt;
-
+use std::backtrace::{Backtrace, BacktraceStatus};
 use std::convert::From;
 use std::error::Error as StdError;
 use std::fmt::Display;
@@ -45,10 +21,8 @@ use std::fmt::Display;
 /// *   The error "kind", taken from Google's canonical error space.
 /// *   A human-readable message.
 /// *   An optional source/cause, exposed through `std::error::Error::cause`.
-/// *   An optional backtrace. This is present if `coded` was compiled
-///     with the `backtrace` or `std_backtrace` feature flags **and**
-///     the program was run with `RUST_BACKTRACE` or `RUST_LIB_BACKTRACE` set as
-///     described at [`std::backtrace`].
+/// *   An optional backtrace. This is present if the program was run with `RUST_BACKTRACE` or
+///     `RUST_LIB_BACKTRACE` set as described at [`std::backtrace`].
 ///
 /// The `Display` impl will display a short summary of this error itself.
 /// It *won't* display the chain of sources or the backtrace.
@@ -65,7 +39,7 @@ impl Error {
             kind,
             msg: Some(msg),
             source: None,
-            backtrace: bt::capture(),
+            backtrace: Backtrace::capture(),
         }))
     }
 
@@ -79,7 +53,7 @@ impl Error {
             kind,
             msg,
             source: Some(source.into()),
-            backtrace: bt::capture(),
+            backtrace: Backtrace::capture(),
         }))
     }
 
@@ -98,27 +72,11 @@ impl Error {
         ErrorChain(self)
     }
 
-    /// Returns a backtrace, if available.
-    #[cfg(feature = "std_backtrace")]
-    pub fn backtrace(&self) -> Option<&std::backtrace::Backtrace> {
-        self.0.backtrace.as_ref()
-    }
-
-    #[cfg(any(feature = "std_backtrace", feature = "backtrace"))]
-    fn fmt_backtrace(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(bt) = self.0.backtrace.as_ref() {
-            write!(f, "\n\nBacktrace:\n{}", bt)
-        } else {
-            write!(
-                f,
-                "\n\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
-            )
-        }
-    }
-
-    #[cfg(not(any(feature = "std_backtrace", feature = "backtrace")))]
-    fn fmt_backtrace(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Ok(())
+    /// Returns a `Backtrace` object.
+    ///
+    /// The returned backtrace may or may not have been captured; see [`Backtrace::status`].
+    pub fn backtrace(&self) -> &Backtrace {
+        &self.0.backtrace
     }
 }
 
@@ -143,7 +101,21 @@ impl Display for ErrorChain<'_> {
             write!(f, "\ncaused by: {}", n)?;
             source = n.source()
         }
-        self.0.fmt_backtrace(f)
+        let int = &self.0 .0;
+        match int.backtrace.status() {
+            BacktraceStatus::Unsupported => Ok(()),
+            BacktraceStatus::Disabled => {
+                write!(
+                    f,
+                    "\n\nnote: run with `RUST_BACKTRACE=1` environment variable to display a \
+                     backtrace"
+                )
+            }
+            BacktraceStatus::Captured => {
+                write!(f, "\n\nBacktrace:\n{}", &int.backtrace)
+            }
+            _ => write!(f, "\n\nUnknown backtrace status"),
+        }
     }
 }
 
@@ -171,7 +143,7 @@ impl Default for ErrorBuilder {
             kind: ErrorKind::Unknown,
             msg: None,
             source: None,
-            backtrace: bt::capture(),
+            backtrace: Backtrace::capture(),
         }))
     }
 }
@@ -225,12 +197,7 @@ struct ErrorInt {
     kind: ErrorKind,
     msg: Option<String>,
     source: Option<Box<dyn StdError + Send + Sync + 'static>>,
-
-    #[cfg_attr(
-        not(any(feature = "std_backtrace", feature = "backtrace")),
-        allow(dead_code)
-    )]
-    backtrace: Option<bt::Backtrace>,
+    backtrace: std::backtrace::Backtrace,
 }
 
 /// Error kind matching Google's "canonical error codes".
@@ -702,7 +669,6 @@ mod tests {
         assert_eq!(msg.matches("outer error").count(), 1);
     }
 
-    #[cfg(any(feature = "std_backtrace", feature = "backtrace"))]
     #[test]
     fn backtrace() {
         std::env::set_var("RUST_LIB_BACKTRACE", "1");

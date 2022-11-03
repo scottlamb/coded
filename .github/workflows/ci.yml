@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         rust:
-          - 1.56.0
+          - 1.65
           - stable
           - nightly
         include:
@@ -28,7 +28,10 @@ jobs:
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ matrix.rust }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        key: rust-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          rust-${{ matrix.rust }}-
+          rust-
     - name: Install Rust
       uses: actions-rs/toolchain@v1
       with:
@@ -36,10 +39,5 @@ jobs:
         toolchain: ${{ matrix.rust }}
         override: true
         components: ${{ matrix.extra_components }}
-    - name: Test with no features
+    - name: Test
       run: cargo test --all-targets
-    - name: Test with backtrace feature
-      run: cargo test --all-targets --features=backtrace
-    - name: Test with std_backtrace feature
-      if: matrix.rust == 'nightly'
-      run: cargo test --all-targets --features=std_backtrace

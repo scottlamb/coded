@@ -1,5 +1,6 @@
 [package]
 name = "coded"
+rust-version = "1.65"
 version = "0.2.0-pre"
 license = "MIT/Apache-2.0"
 readme = "README.md"
@@ -10,13 +11,3 @@ categories = ["rust-patterns"]
 repository = "https://github.com/scottlamb/coded"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[features]
-# See lib.rs doc comment for description of features.
-default = []
-
-# requires Rust 1.65+ (expected to be released 2022-11-03).
-std_backtrace = []
-
-[dependencies]
-backtrace = { version = "0.3.63", optional = true }
